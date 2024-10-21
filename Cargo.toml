@@ -1,0 +1,36 @@
+# idk/Cargo.toml
+
+[package]
+name         = "idk"
+
+edition      = "2021"
+rust-version = "1.82.0"
+
+authors      = ["mochou-p"]
+description  = "*nix process memory editor"
+license      = "MIT OR Apache-2.0"
+repository   = "https://github.com/mochou-p/idk"
+
+[[bin]]
+name = "blue"
+path = "src/blue.rs"
+
+[[bin]]
+name = "red"
+path = "src/red.rs"
+
+[dependencies]
+libc = "0.2.161"
+
+[profile.release]
+strip         = "symbols"
+lto           = "fat"
+panic         = "abort"
+codegen-units = 1
+
+[lints.clippy]
+all      = "deny"
+pedantic = "deny"
+nursery  = "deny"
+cargo    = "deny"
+
