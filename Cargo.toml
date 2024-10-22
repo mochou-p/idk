@@ -19,9 +19,6 @@ path = "src/blue.rs"
 name = "red"
 path = "src/red.rs"
 
-[dependencies]
-libc = "0.2.161"
-
 [profile.release]
 strip         = "symbols"
 lto           = "fat"

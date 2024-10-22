@@ -1,17 +1,12 @@
 // idk/src/blue.rs
 
-use std::{io::{stdin, Result}, process::id};
+use std::{io::{stdin, Result as IoResult}, process::id};
 
-fn main() -> Result<()> {
-    let x: i64 = 420;
+fn main() -> IoResult<()> {
+    println!("use this: cargo run --bin red {}", id());
 
-    println!("use this: sudo -E cargo run --bin red {} {:p} 1337", id(), &x);
-    println!("x = {x}");
-
-    let mut s = String::new();
-    stdin().read_line(&mut s)?;
-
-    println!("x = {x}");
+    let mut input = String::new();
+    stdin().read_line(&mut input)?;
 
     Ok(())
 }

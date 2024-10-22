@@ -11,10 +11,8 @@
 # run the target program
 cargo run --bin blue
 
-# while the target is waiting for user input, change it's memory
-sudo -E cargo run --bin red [PID] [ADDRESS] [NEW VALUE]
-
-# press [Enter] in the target to see the new value
+# print it's memory bounds
+cargo run --bin red [PID]
 ```
 
 ## License

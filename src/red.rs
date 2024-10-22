@@ -3,55 +3,176 @@
 use std::{
     env::args,
     error::Error,
-    io::{Error as IoError, ErrorKind},
-    ptr::null_mut
+    fmt::{Formatter, Result as FmtResult, Display},
+    fs::{exists, read_to_string, File},
+    io::{BufReader, Error as IoError, ErrorKind, Result as IoResult, BufRead}
 };
 
-use libc::{
-    c_void,
-    ptrace, waitpid,
-    PTRACE_ATTACH, PTRACE_PEEKDATA, PTRACE_POKEDATA, PTRACE_DETACH
-};
+type Pid     = i32;
+type Address = usize;
+type Size    = usize;
+
+const KIB: Size = 1024;
+const MIB: Size = 1024 * 1024;
+const GIB: Size = 1024 * 1024 * 1024;
+
+trait MemoryRegion {
+    fn new(start: Address, end: Address) -> Self;
+
+    fn start(&self) -> Address;
+    fn   end(&self) -> Address;
+
+    fn size(&self) -> Size {
+        self.end() - self.start()
+    }
+
+    fn parse_map<T: MemoryRegion>(entry: String) -> Result<T, Box<dyn Error>> {
+        let region = &entry[..entry.find(' ').ok_or("PID {pid} has a corrupted maps file")?];
+        let dash   = (region.len() - 1) / 2 + 1;
+        let start  = Address::from_str_radix(&region[..dash-1], 16)?;
+        let end    = Address::from_str_radix(&region[  dash..], 16)?;
+
+        Ok(T::new(start, end))
+    }
+}
+
+struct Stack {
+    start: Address,
+    end:   Address
+}
+
+impl MemoryRegion for Stack {
+    fn new(start: Address, end: Address) -> Self {
+        Self { start, end }
+    }
+
+    fn start(&self) -> Address {
+        self.start
+    }
+
+    fn end(&self) -> Address {
+        self.end
+    }
+}
+
+impl Display for Stack {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "stack:\t{}\t[{:#x} - {:#x}]", pretty_size(self.size()), self.start, self.end)
+    }
+}
+
+struct Heap {
+    start: Address,
+    end:   Address
+}
+
+impl MemoryRegion for Heap {
+    fn new(start: Address, end: Address) -> Self {
+        Self { start, end }
+    }
+
+    fn start(&self) -> Address {
+        self.start
+    }
+
+    fn end(&self) -> Address {
+        self.end
+    }
+}
+
+impl Display for Heap {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "heap:\t{}\t[{:#x} - {:#x}]", pretty_size(self.size()), self.start, self.end)
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = args().skip(1);
 
-    if args.len() != 3 {
-        eprintln!("Usage: cargo run --bin red [PID] [ADDRESS] [NEW VALUE]\n(get it from `cargo run --bin blue`)");
+    if args.len() != 1 {
+        eprintln!("Usage: cargo run --bin red [PID]");
         return Ok(());
     }
 
-    let pid       = args.next().ok_or("arg missing: PID")?.parse::<i32>()?;
-    let addr      = usize::from_str_radix(&(args.next().ok_or("arg missing: address")?)[2..], 16)?;
-    let new_value = args.next().ok_or("arg missing: new value")?.parse::<i64>()?;
+    let pid = args.next().ok_or("arg missing: PID")?.parse::<Pid>()?;
 
-    if unsafe { ptrace(PTRACE_ATTACH, pid, null_mut::<*mut c_void>(), null_mut::<*mut c_void>()) } == -1 {
-        return Err(format!("PTRACE_ATTACH error: {}", IoError::last_os_error()).into());
-    }
+    check(pid)?;
 
-    let n  = unsafe { waitpid(pid, null_mut(), 0) };
-    if  n != pid {
-        return Err(format!("waitpid returned {n}: {}", IoError::last_os_error()).into());
-    }
+    println!("process `{}`", get_name(pid)?);
 
-    let data = unsafe { ptrace(PTRACE_PEEKDATA, pid, addr as *mut c_void, null_mut::<*mut c_void>()) };
-    let err  = IoError::last_os_error();
-    if data == -1 && err.kind() as i32 <= ErrorKind::Other as i32 {
-        return Err(format!("PTRACE_PEEKDATA error: {err}").into());
-    }
+    let (stack, heap_option) = parse_maps(pid)?;
 
-    print!("{pid}[{addr:#x}]: {data}");
+    println!("{stack}");
 
-    if unsafe { ptrace(PTRACE_POKEDATA, pid, addr as *mut c_void, new_value as *mut c_void) } == -1 {
-        return Err(format!("PTRACE_POKEDATA error: {}", IoError::last_os_error()).into());
-    }
-
-    println!(" -> {}", unsafe { ptrace(PTRACE_PEEKDATA, pid, addr as *mut c_void, null_mut::<*mut c_void>()) });
-
-    if unsafe { ptrace(PTRACE_DETACH, pid, null_mut::<*mut c_void>(), null_mut::<*mut c_void>()) } == -1 {
-        return Err(format!("PTRACE_DETACH error: {}", IoError::last_os_error()).into());
+    if let Some(heap) = heap_option {
+        println!("{heap}");
+    } else {
+        println!("No heap");
     }
 
     Ok(())
+}
+
+fn pretty_size(size: Size) -> String {
+    #[expect(clippy::cast_precision_loss)]
+    match size {
+        0  ..KIB => format!("{size} B"),
+        KIB..MIB => format!("{:.2} KiB", size as f64 / KIB as f64),
+        MIB..GIB => format!("{:.2} MiB", size as f64 / MIB as f64),
+        _        => format!("{:.2} GiB", size as f64 / GIB as f64)
+    }
+}
+
+fn check(pid: Pid) -> IoResult<()> {
+    if !exists(format!("/proc/{pid}/"))? {
+        return Err(IoError::new(ErrorKind::NotFound, format!("PID {pid} does not exist")));
+    }
+
+    Ok(())
+}
+
+fn get_name(pid: Pid) -> IoResult<String> {
+    let mut name = read_to_string(format!("/proc/{pid}/comm"))?;
+    name.pop();
+
+    Ok(name)
+}
+
+fn parse_maps(pid: Pid) -> Result<(Stack, Option<Heap>), Box<dyn Error>> {
+    let file   = File::open(format!("/proc/{pid}/maps"))?;
+    let reader = BufReader::new(file);
+    let lines  = reader.lines();
+
+    let (mut stack_option, mut heap_option) = (None, None);
+
+    for line_option in lines {
+        let line = line_option?;
+
+        if line.chars().last().ok_or("PID {pid} has a corrupted maps file")? == ']' {
+            let start = line.rfind('[').ok_or("PID {pid} has a corrupted maps file")?;
+
+            match &line[start..] {
+                "[heap]" => {
+                    heap_option = Some(<Heap as MemoryRegion>::parse_map(line)?);
+
+                    if stack_option.is_some() {
+                        break;
+                    }
+                },
+                "[stack]" => {
+                    stack_option = Some(<Stack as MemoryRegion>::parse_map(line)?);
+
+                    if heap_option.is_some() {
+                        break;
+                    }
+                },
+                _ => ()
+            }
+        }
+    }
+
+    let stack = stack_option.ok_or("PID {pid} has no [stack] (this should never happen)")?;
+
+    Ok((stack, heap_option))
 }
 
