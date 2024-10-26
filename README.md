@@ -4,15 +4,17 @@
 *nix process memory editor
 
 ## Usage
-🟦🎯  🏹🟥
+🟦🎯 🏹🟥
 ```sh
 # clone and cd into this repo
 
 # run the target program
 cargo run --bin blue
 
-# print it's memory bounds
-cargo run --bin red [PID]
+# find a memory address by value, and write into it
+sudo -E cargo run --bin red [PID] [VALUE] [NEW VALUE]
+
+# press [Enter] in the target to see the new value
 ```
 
 ## License
