@@ -1,4 +1,4 @@
-// idk/src/red.rs
+// purple/src/red.rs
 
 use std::{
     array::TryFromSliceError,

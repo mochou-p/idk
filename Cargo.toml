@@ -1,7 +1,7 @@
-# idk/Cargo.toml
+# purple/Cargo.toml
 
 [package]
-name         = "idk"
+name         = "purple"
 
 edition      = "2021"
 rust-version = "1.82.0"
@@ -9,7 +9,7 @@ rust-version = "1.82.0"
 authors      = ["mochou-p"]
 description  = "*nix process memory editor"
 license      = "MIT OR Apache-2.0"
-repository   = "https://github.com/mochou-p/idk"
+repository   = "https://github.com/mochou-p/purple"
 
 [[bin]]
 name = "blue"

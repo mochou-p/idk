@@ -1,6 +1,6 @@
-<!-- idk/README.md -->
+<!-- purple/README.md -->
 
-# idk
+# purple
 *nix process memory editor
 
 ## blue 🟦🎯
@@ -29,8 +29,9 @@ sudo -E cargo run --bin red [PID]
 | `e`/`exit` or empty | exit |
 
 ## TODO
-- more primitives types than just `usize`
+- more primitive types than just `usize`
 - live updates
+- async
 - GUI
 
 ## License

@@ -1,4 +1,4 @@
-// idk/src/blue.rs
+// purple/src/blue.rs
 
 use std::{error::Error, io::stdin, process::id};
 
