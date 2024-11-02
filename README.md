@@ -3,19 +3,35 @@
 # idk
 *nix process memory editor
 
-## Usage
-🟦🎯 🏹🟥
+## blue 🟦🎯
 ```sh
-# clone and cd into this repo
-
 # run the target program
 cargo run --bin blue
 
-# find a memory address by value, and write into it
-sudo -E cargo run --bin red [PID] [VALUE] [NEW VALUE]
+# change the x value so it can be found
+[+-*/][number (usize)] # examples: +33, -5, *11, /2
 
-# press [Enter] in the target to see the new value
+# press [Enter] to print x and exit after red changed it
 ```
+
+## red 🟥🏹
+```sh
+# run the memory editor
+sudo -E cargo run --bin red [PID]
+
+# use commands to find and rewrite memory of [PID]
+```
+| command | action |
+|-|-|
+| `s`/`stack` or `h`/`heap` | selects a memory region for editing |
+| `number` | searches the current memory region for values matching `number`<br><br>search is iterative, searching from the list of found addresses so you can find a value that:<br>- keeps changing<br>- you change from the target process<br><br>when only one address matches, a prompt to write to it appears |
+| `c`/`clear` | clears the current memory address list |
+| `e`/`exit` or empty | exit |
+
+## TODO
+- more primitives types than just `usize`
+- live updates
+- GUI
 
 ## License
 Licensed under either of
